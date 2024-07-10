@@ -3,6 +3,8 @@ import torch.functional as F
 import torch
 import torch.optim as optim
 
+import os
+
 class PositionalEncodingLayer(nn.Module):
     def __init__(self, length):
         super(PositionalEncodingLayer, self).__init__()
@@ -81,14 +83,17 @@ def save_model (path: str, model: NerfModel):
     torch.save(model_state, path)
 
 def load_model (path: str) -> NerfModel:
-    model_state = torch.load(path)
+    if os.path.exists(path):
+        model_state = torch.load(path)
 
-    l_pos = model_state['l_pos']
-    l_dir = model_state['l_dir']
-    hidden1 = model_state['hidden1']
-    hidden2 = model_state['hidden2']
+        l_pos = model_state['l_pos']
+        l_dir = model_state['l_dir']
+        hidden1 = model_state['hidden1']
+        hidden2 = model_state['hidden2']
 
-    model = NerfModel(l_pos, l_dir, hidden1, hidden2)
-    model.load_state_dict(model_state['state_dict'])
+        model = NerfModel(l_pos, l_dir, hidden1, hidden2)
+        model.load_state_dict(model_state['state_dict'])
+    else:
+        model = NerfModel()
 
     return model

@@ -1,4 +1,5 @@
 from nerf_types import NerfDataset
+from nerf_utils import get_rays
 
 import torch
 from torchvision.transforms.functional import pil_to_tensor
@@ -6,7 +7,6 @@ from torchvision.transforms.functional import pil_to_tensor
 from PIL import Image
 
 from typing import Dict
-from math import tan
 import os
 import glob
 import json
@@ -14,27 +14,14 @@ import json
 def parse_blender (fov: float, c2w: torch.tensor, image: torch.tensor) -> NerfDataset:
     W = image.shape[2]
     H = image.shape[1]
-    focal = 0.5 * W / tan(0.5 * fov)
-
-    grid_x, grid_y = torch.meshgrid(torch.arange(0, W, dtype = torch.float32),
-                                    torch.arange(0, H, dtype = torch.float32), indexing='xy')
-
-    # in camera homogeneous coordinates
-    dirs = torch.stack([(grid_x - W*0.5) / focal, (grid_y - H*0.5) / focal, -torch.ones_like(grid_x), torch.zeros_like(grid_x)], -1).reshape(H*W, 4)
-    org = torch.tensor([0, 0, 0, 1], dtype = torch.float32)
-
-    # in world coordinates
-    dirs = (dirs @ c2w.T)[:, :3]
-    org = (org @ c2w.T)[:3]
-    orgs = org.repeat(H*W, 1)
     
-    rays = torch.cat((orgs, dirs), dim=1)
+    rays = get_rays(W, H, fov, c2w)
 
     image_rgb = image[:3, :, :]
     image_alpha = image[3, :, :].reshape((1, H, W))
     colors = (image_rgb * image_alpha).permute(1, 2, 0)[:, :, :3].reshape(H*W, 3)
 
-    return NerfDataset(rays=rays, colors=colors)
+    return NerfDataset(width=W, height=H, rays=rays, colors=colors)
 
 def load_blender (base_path: str, res_ratio: float = 1.0) -> Dict[str, NerfDataset]:
     search_pattern = os.path.join(base_path, 'transforms_*.json')
@@ -44,7 +31,7 @@ def load_blender (base_path: str, res_ratio: float = 1.0) -> Dict[str, NerfDatas
 
     for json_file in json_files:
         try:
-            dataset = NerfDataset()
+            dataset = None
 
             with open(json_file, 'r') as file:
                 json_data = json.load(file)
@@ -62,7 +49,11 @@ def load_blender (base_path: str, res_ratio: float = 1.0) -> Dict[str, NerfDatas
 
                     c2w = torch.tensor(frame['transform_matrix'])
 
-                    dataset.append(parse_blender(fov, c2w, image))
+                    parsed = parse_blender(fov, c2w, image)
+                    if dataset is None:
+                        dataset = parsed
+                    else:
+                        dataset.append(parsed)
 
             # ".../transforms_train.json" -> "train"
             short_name = json_file.replace('_', '.').split(sep = '.')[-2]

@@ -1,0 +1,11 @@
+[general]
+model_path = ./weight/model.pt
+num_sample_coarse = 64
+
+[train]
+model_save_interval = 10
+batch_size = 10
+learning_rate = 1e-4
+
+[test]
+output_path = ./output
