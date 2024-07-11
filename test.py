@@ -49,5 +49,5 @@ def test(dataset: NerfDataset):
         print(f'Image saved: {batch_index}')
 
 if __name__ == '__main__':
-    dataset = load_blender('./NeRF_Data/nerf_synthetic/chair', 1/40)['test']
+    dataset = load_blender('./NeRF_Data/nerf_synthetic/chair', 1/20)['test']
     test(dataset)
