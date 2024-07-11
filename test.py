@@ -32,7 +32,7 @@ def test(dataset: NerfDataset):
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=H*W, shuffle=False)
 
     for batch_index, batch in enumerate(dataloader):
-        inputs, _ = batch
+        inputs, outputs = batch
         sample, t_sample = sample_coarse(inputs, num_sample_coarse, sample_near, sample_far)
 
         model_outputs = model(sample)
@@ -41,7 +41,12 @@ def test(dataset: NerfDataset):
         image = to_pil_image(pixels.detach().reshape((H, W, 3)).numpy())
         image_path = os.path.join(output_path, f'output{batch_index}.png')
         image.save(image_path, format='PNG')
-        print(f'Image saved: {image_path}')
+
+        image = to_pil_image(outputs.detach().reshape((H, W, 3)).numpy())
+        image_path = os.path.join(output_path, f'output{batch_index}-gt.png')
+        image.save(image_path, format='PNG')
+
+        print(f'Image saved: {batch_index}')
 
 if __name__ == '__main__':
     dataset = load_blender('./NeRF_Data/nerf_synthetic/chair', 1/40)['test']
