@@ -18,6 +18,7 @@ def test(dataset: NerfDataset):
     model_path = config['model_path']
     output_path = config['output_path']
     num_sample_coarse = int(config['num_sample_coarse'])
+    save_gt = bool(config['save_gt'])
 
     # Load dataset arguments
     args = dataset.args
@@ -42,12 +43,13 @@ def test(dataset: NerfDataset):
         image_path = os.path.join(output_path, f'output{batch_index}.png')
         image.save(image_path, format='PNG')
 
-        image = to_pil_image(outputs.detach().reshape((H, W, 3)).numpy())
-        image_path = os.path.join(output_path, f'output{batch_index}-gt.png')
-        image.save(image_path, format='PNG')
+        if save_gt:
+            image = to_pil_image(outputs.detach().reshape((H, W, 3)).numpy())
+            image_path = os.path.join(output_path, f'output{batch_index}-gt.png')
+            image.save(image_path, format='PNG')
 
         print(f'Image saved: {batch_index}')
 
 if __name__ == '__main__':
-    dataset = load_blender('./NeRF_Data/nerf_synthetic/chair', 1/20)['test']
+    dataset = load_blender('./NeRF_Data/nerf_synthetic/chair', 1/8)['test']
     test(dataset)

@@ -54,13 +54,16 @@ def train(dataset: NerfDataset):
     if save_image:
         rays, colors = dataset[0:H*W]
         image_gt = to_pil_image(colors.detach().reshape((H, W, 3)).numpy())
+        image_path = os.path.join(output_path, 'train-gt.png')
+        image_gt.save(image_path, format='PNG')
 
     for epoch in range(num_epoch):
         print(f'Training: Epoch {epoch}.')
 
         start_time = time.time()
 
-        for batch in dataloader:
+        for (batch_idx, batch) in enumerate(dataloader):
+            print(f'Training: batch {batch_idx}.')
             inputs, outputs = batch
             sample, t_sample = sample_coarse(inputs, num_sample_coarse, sample_near, sample_far)
 
@@ -86,14 +89,11 @@ def train(dataset: NerfDataset):
                 pixels = render(t_sample, model_outputs)
 
                 image = to_pil_image(pixels.detach().reshape((H, W, 3)).numpy())
-                image_path = os.path.join(output_path, f'output{epoch}.png')
+                image_path = os.path.join(output_path, f'train-epoch{epoch}.png')
                 image.save(image_path, format='PNG')
-
-                image_path = os.path.join(output_path, f'output{epoch}-gt.png')
-                image_gt.save(image_path, format='PNG')
 
                 print(f'Image saved.')
 
 if __name__ == '__main__':
-    dataset = load_blender('./NeRF_Data/nerf_synthetic/chair', 1/20)['train']
+    dataset = load_blender('./NeRF_Data/nerf_synthetic/chair', 1/8)['train']
     train(dataset)

@@ -9,7 +9,7 @@ def get_rays (W: int, H: int, fov: float, c2w: torch.tensor) -> torch.tensor:
                                     torch.arange(0, H, dtype = torch.float32), indexing='xy')
 
     # in camera homogeneous coordinates
-    dirs = torch.stack([(grid_x - W*0.5) / focal, (grid_y - H*0.5) / focal, -torch.ones_like(grid_x), torch.zeros_like(grid_x)], -1).reshape(H*W, 4)
+    dirs = torch.stack([(grid_x - W*0.5) / focal, -(grid_y - H*0.5) / focal, -torch.ones_like(grid_x), torch.zeros_like(grid_x)], -1).reshape(H*W, 4)
     org = torch.tensor([0, 0, 0, 1], dtype = torch.float32)
 
     # in world coordinates
