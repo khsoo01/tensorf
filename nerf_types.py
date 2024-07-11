@@ -1,10 +1,22 @@
 import torch
 from torch.utils.data import Dataset
 
-class NerfDataset(Dataset):
-    def __init__(self, width, height, rays = torch.tensor([]), colors = torch.tensor([])):
+class NerfDatasetArgs:
+    def __init__(self, width: int, height: int, near: float, far: float):
         self.width = width
         self.height = height
+        self.near = near
+        self.far = far
+
+    def __eq__(self, other):
+        return (self.width == other.width and
+                self.height == other.height and
+                self.near == other.near and
+                self.far == other.far)
+
+class NerfDataset(Dataset):
+    def __init__(self, args: NerfDatasetArgs, rays = torch.tensor([]), colors = torch.tensor([])):
+        self.args = args
         self.rays = rays
         self.colors = colors
 
@@ -15,7 +27,7 @@ class NerfDataset(Dataset):
         return self.rays[index], self.colors[index]
     
     def append (self, other): # other: NerfDataset
-        assert self.width == other.width and self.height == other.height
+        assert self.args == other.args
         if len(self) <= 0:
             self.rays = other.rays.clone().detach()
             self.colors = other.colors.clone().detach()

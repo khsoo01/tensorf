@@ -14,6 +14,7 @@ def get_rays (W: int, H: int, fov: float, c2w: torch.tensor) -> torch.tensor:
 
     # in world coordinates
     dirs = (dirs @ c2w.T)[:, :3]
+    dirs = dirs / torch.norm(dirs, dim=-1, keepdim=True) # normalize
     org = (org @ c2w.T)[:3]
     orgs = org.repeat(H*W, 1)
     
@@ -21,8 +22,34 @@ def get_rays (W: int, H: int, fov: float, c2w: torch.tensor) -> torch.tensor:
 
     return rays
 
-def sample_coarse (rays: torch.tensor, num_sample: int) -> torch.tensor:
-    pass
+def sample_coarse (rays: torch.tensor, num_sample: int, near: float, far: float) -> torch.tensor:
+    orgs = rays[..., :3].unsqueeze(-2) # shape: (..., 1, 3)
+    dirs = rays[..., 3:].unsqueeze(-2) # shape: (..., 1, 3)
 
-def render (rays: torch.tensor, points: torch.tensor) -> torch.tensor:
-    pass
+    intervals = torch.linspace(near, far, num_sample+1)
+    midpoints = (intervals[1:] + intervals[:-1]) / 2
+
+    t_samples = midpoints + (torch.rand_like(midpoints) - 0.5) * (far - near) / num_sample
+    t_samples = t_samples.unsqueeze(-1) # shape: (num_sample, 1)
+    pos_samples = orgs + t_samples * dirs # shape: (..., num_sample, 3)
+    dir_samples = torch.broadcast_to(dirs, pos_samples.shape) # shape: (..., num_sample, 3)
+
+    samples = torch.cat([pos_samples, dir_samples], -1) # shape: (..., num_sample, 6)
+
+    return samples, t_samples
+
+def render (t_samples: torch.tensor, color_d: torch.tensor) -> torch.tensor:
+    color = color_d[..., :3] # shape: (..., num_sample, 3)
+    density = color_d[..., 3:] # shape: (..., num_sample, 1)
+
+    delta = t_samples[1:] + t_samples[:-1]
+    broadcasted_inf = torch.broadcast_to(torch.tensor([1e10]), delta[..., :1, :1].shape)
+    delta = torch.cat([delta, broadcasted_inf], -2) # append inf = 1e10; shape: (num_sample, 1)
+
+    exp_sd = torch.exp(-density*delta) # shape: (..., num_sample, 1)
+    T = torch.cumprod(exp_sd + 1e-10, dim=-2)
+    broadcasted_one = torch.broadcast_to(torch.tensor([1.0]), T[...,:1,:1].shape)
+    T = torch.cat([broadcasted_one, T[...,:-1,:1]], -2) # Equivalent with exclusive=True
+
+    out_color = (T * (1.0 - exp_sd) * color).sum(dim=-2) # shape: (..., 3)
+    return out_color

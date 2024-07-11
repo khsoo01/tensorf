@@ -52,7 +52,7 @@ class NerfModel(nn.Module):
 
     def forward (self, input):
         #  input : [..., 6] (Position, Direction)
-        # output : [..., 4] (R, G, B, Depth)
+        # output : [..., 4] (R, G, B, Density)
         input_pos = input[..., :3]
         input_dir = input[..., 3:]
 
