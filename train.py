@@ -1,6 +1,6 @@
 from nerf_model import NerfModel, load_model, save_model
 from nerf_types import NerfDataset
-from nerf_utils import sample_coarse, render
+from nerf_utils import get_lr, sample_coarse, render
 from load_blender import load_blender
 
 import torch
@@ -9,23 +9,33 @@ import torch.optim as optim
 from torchvision.transforms.functional import to_pil_image
 
 import configparser
-import time
 import os
 
-def train(dataset: NerfDataset):
+def train():
     # Load config
     config = configparser.ConfigParser()
     config.read('config.txt')
     config = dict(config['general']) | dict(config['train'])
 
     model_path = config['model_path']
-    output_path = config['output_path']
-    model_save_epoch = int(config['model_save_epoch'])
-    num_epoch = int(config['num_epoch'])
-    batch_size = int(config['batch_size'])
-    learning_rate = float(config['learning_rate'])
+    dataset_type = config['dataset_type']
+    dataset_path = config['dataset_path']
     num_sample_coarse = int(config['num_sample_coarse'])
+
+    num_iter = int(config['num_iteration'])
+    batch_size = int(config['batch_size'])
+    lr_start = float(config['learning_rate_start'])
+    lr_end = float(config['learning_rate_end'])
+    model_save_interval = int(config['model_save_interval'])
     save_image = bool(config['save_image'])
+    output_path = config['output_path']
+
+    # Load dataset
+    if dataset_type == 'blender':
+        dataset = load_blender(dataset_path)['train']
+    else:
+        print('Invalid dataset type. Aborting.')
+        exit(0)
 
     # Load dataset arguments
     args = dataset.args
@@ -47,53 +57,58 @@ def train(dataset: NerfDataset):
         print('Device: cpu')
         device = cpu
     
-    model = load_model(model_path).to(device)
+    model, cur_iter = load_model(model_path)
+    model = model.to(device)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
 
+    # Setup example input and ground truth image from the input
     if save_image:
-        rays, colors = dataset[0:H*W]
-        image_gt = to_pil_image(colors.detach().reshape((H, W, 3)).numpy())
-        image_path = os.path.join(output_path, 'train-gt.png')
-        image_gt.save(image_path, format='PNG')
+        example_input, example_output_gt = dataset[0:H*W]
+        example_image_gt = to_pil_image(example_output_gt.detach().reshape((H, W, 3)).numpy())
+        example_image_gt.save(os.path.join(output_path, 'train-gt.png'), format='PNG')
 
-    for epoch in range(num_epoch):
-        print(f'Training: Epoch {epoch}.')
+    # Evaluate image from rays using model
+    def eval_image(rays: torch.tensor):
+        sample, t_sample = sample_coarse(rays, num_sample_coarse, sample_near, sample_far)
+        sample = sample.to(device)
+        model_outputs = model(sample).to(cpu)
+        pixels = render(t_sample, model_outputs)
+        return pixels
 
-        start_time = time.time()
-
-        for (batch_idx, batch) in enumerate(dataloader):
-            print(f'Training: batch {batch_idx}.')
+    while True:
+        for batch in dataloader:
+            print(f'Training: iteration {cur_iter}.')
+            # Evaluate image from batch input and backpropagate loss
             inputs, outputs = batch
-            sample, t_sample = sample_coarse(inputs, num_sample_coarse, sample_near, sample_far)
-
+            
             optimizer.zero_grad()
-
-            sample = sample.to(device)
-            model_outputs = model(sample).to(cpu)
-            pixels = render(t_sample, model_outputs)
-            loss = nn.MSELoss()(pixels, outputs)
+            loss = nn.MSELoss()(eval_image(inputs), outputs)
             loss.backward()
-
             optimizer.step()
-        
-        end_time = time.time()
-        print(f'Time ellapsed: {end_time - start_time} seconds.')
 
-        if epoch % model_save_epoch == 0:
-            save_model(model_path, model)
+            cur_iter += 1
 
-            if save_image:
-                sample, t_sample = sample_coarse(rays, num_sample_coarse, sample_near, sample_far)
-                model_outputs = model(sample.to(device)).to(cpu)
-                pixels = render(t_sample, model_outputs)
+            # Update learning rate
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = get_lr(lr_start, lr_end, cur_iter, num_iter)
 
-                image = to_pil_image(pixels.detach().reshape((H, W, 3)).numpy())
-                image_path = os.path.join(output_path, f'train-epoch{epoch}.png')
-                image.save(image_path, format='PNG')
+            # Save model and example image
+            if cur_iter % model_save_interval == 0:
+                save_model(model_path, model, cur_iter)
+                print('Model saved.')
 
-                print(f'Image saved.')
+                if save_image:
+                    example_output = eval_image(example_input)
+                    example_image = to_pil_image(example_output.detach().reshape((H, W, 3)).numpy())
+                    example_image.save(os.path.join(output_path, f'train-iter{cur_iter}.png'), format='PNG')
+                    print('Image saved.')
+
+            # Break infinite loop if the iteration is finished
+            if cur_iter >= num_iter:
+                break
+        if cur_iter >= num_iter:
+            break
 
 if __name__ == '__main__':
-    dataset = load_blender('./NeRF_Data/nerf_synthetic/chair', 1/8)['train']
-    train(dataset)
+    train()

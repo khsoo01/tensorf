@@ -25,6 +25,8 @@ def parse_blender (fov: float, c2w: torch.tensor, image: torch.tensor) -> NerfDa
     return NerfDataset(args=args, rays=rays, colors=colors)
 
 def load_blender (base_path: str, res_ratio: float = 1.0) -> Dict[str, NerfDataset]:
+    print(f"Loading blender dataset from {base_path}.")
+
     search_pattern = os.path.join(base_path, 'transforms_*.json')
     json_files = glob.glob(search_pattern)
 
@@ -64,6 +66,7 @@ def load_blender (base_path: str, res_ratio: float = 1.0) -> Dict[str, NerfDatas
         except Exception as e:
             print(f'Error occurred in file {json_file}: {e}')
 
+    print("Finished dataset loading.")
     return result
 
 if __name__ == '__main__':

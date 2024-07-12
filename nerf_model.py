@@ -72,13 +72,14 @@ class NerfModel(nn.Module):
         return output
 
 
-def save_model (path: str, model: NerfModel):
+def save_model (path: str, model: NerfModel, num_iter: int):
     model_state = {
         'state_dict': model.state_dict(),
         'l_pos': model.l_pos,
         'l_dir': model.l_dir,
         'hidden1': model.hidden1,
-        'hidden2': model.hidden2
+        'hidden2': model.hidden2,
+        'num_iter': num_iter
     }
     torch.save(model_state, path)
 
@@ -93,7 +94,10 @@ def load_model (path: str) -> NerfModel:
 
         model = NerfModel(l_pos, l_dir, hidden1, hidden2)
         model.load_state_dict(model_state['state_dict'])
+
+        num_iter = model_state['num_iter']
     else:
         model = NerfModel()
+        num_iter = 0
 
-    return model
+    return model, num_iter

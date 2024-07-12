@@ -9,16 +9,26 @@ from torchvision.transforms.functional import to_pil_image
 import configparser
 import os
 
-def test(dataset: NerfDataset):
+def test():
     # Load config
     config = configparser.ConfigParser()
     config.read('config.txt')
     config = dict(config['general']) | dict(config['test'])
 
     model_path = config['model_path']
-    output_path = config['output_path']
+    dataset_type = config['dataset_type']
+    dataset_path = config['dataset_path']
     num_sample_coarse = int(config['num_sample_coarse'])
+    
     save_gt = (config['save_gt'] == 'True')
+    output_path = config['output_path']
+
+    # Load dataset
+    if dataset_type == 'blender':
+        dataset = load_blender(dataset_path)['test']
+    else:
+        print('Invalid dataset type. Aborting.')
+        exit(0)
 
     # Load dataset arguments
     args = dataset.args
@@ -28,7 +38,7 @@ def test(dataset: NerfDataset):
     sample_far = args.far
 
     # Start testing
-    model = load_model(model_path)
+    model, _ = load_model(model_path)
     model.eval()
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=H*W, shuffle=False)
 
@@ -40,16 +50,13 @@ def test(dataset: NerfDataset):
         pixels = render(t_sample, model_outputs)
 
         image = to_pil_image(pixels.detach().reshape((H, W, 3)).numpy())
-        image_path = os.path.join(output_path, f'output{batch_index}.png')
-        image.save(image_path, format='PNG')
+        image.save(os.path.join(output_path, f'output{batch_index}.png'), format='PNG')
 
         if save_gt:
             image = to_pil_image(outputs.detach().reshape((H, W, 3)).numpy())
-            image_path = os.path.join(output_path, f'output{batch_index}-gt.png')
-            image.save(image_path, format='PNG')
+            image.save(os.path.join(output_path, f'output{batch_index}-gt.png'), format='PNG')
 
         print(f'Image saved: {batch_index}')
 
 if __name__ == '__main__':
-    dataset = load_blender('./NeRF_Data/nerf_synthetic/chair', 1/8)['test']
-    test(dataset)
+    test()

@@ -2,6 +2,9 @@ import torch
 
 from math import tan
 
+def get_lr (lr_start: float, lr_end: float, cur_iter: int, num_iter: int):
+    return lr_start * ((lr_end / lr_start) ** (cur_iter / num_iter))
+
 def get_rays (W: int, H: int, fov: float, c2w: torch.tensor) -> torch.tensor:
     focal = 0.5 * W / tan(0.5 * fov)
 
