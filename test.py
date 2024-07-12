@@ -18,6 +18,7 @@ def test():
     model_path = config['model_path']
     dataset_type = config['dataset_type']
     dataset_path = config['dataset_path']
+    batch_size = int(config['batch_size'])
     num_sample_coarse = int(config['num_sample_coarse'])
     
     save_gt = (config['save_gt'] == 'True')
@@ -38,22 +39,47 @@ def test():
     sample_far = args.far
 
     # Start testing
+    cpu = torch.device('cpu')
+
+    if torch.cuda.is_available():
+        print('Device: cuda')
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        print('Device: mps')
+        device = torch.device('mps')
+    else:
+        print('Device: cpu')
+        device = cpu
+    
     model, _ = load_model(model_path)
     model.eval()
+    model = model.to(device)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=H*W, shuffle=False)
 
-    for batch_index, batch in enumerate(dataloader):
-        inputs, outputs = batch
-        sample, t_sample = sample_coarse(inputs, num_sample_coarse, sample_near, sample_far)
-
-        model_outputs = model(sample)
+    # Evaluate image from rays using model
+    def eval_image(rays: torch.tensor):
+        sample, t_sample = sample_coarse(rays, num_sample_coarse, sample_near, sample_far)
+        sample = sample.to(device)
+        model_outputs = model(sample).to(cpu)
         pixels = render(t_sample, model_outputs)
+        return pixels
 
-        image = to_pil_image(pixels.detach().reshape((H, W, 3)).numpy())
+    for batch_index, batch in enumerate(dataloader):
+        inputs, outputs_gt = batch
+
+        outputs = []
+        for start_index in range(0, H*W, batch_size):
+            end_index = min(start_index + batch_size, H*W)
+            with torch.no_grad():
+                outputs.append(eval_image(inputs[start_index:end_index]))
+        
+        outputs = torch.cat(outputs, 0)
+
+        image = to_pil_image(outputs.detach().reshape((H, W, 3)).numpy())
         image.save(os.path.join(output_path, f'output{batch_index}.png'), format='PNG')
 
         if save_gt:
-            image = to_pil_image(outputs.detach().reshape((H, W, 3)).numpy())
+            image = to_pil_image(outputs_gt.detach().reshape((H, W, 3)).numpy())
             image.save(os.path.join(output_path, f'output{batch_index}-gt.png'), format='PNG')
 
         print(f'Image saved: {batch_index}')

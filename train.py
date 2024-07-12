@@ -20,13 +20,14 @@ def train():
     model_path = config['model_path']
     dataset_type = config['dataset_type']
     dataset_path = config['dataset_path']
+    batch_size = int(config['batch_size'])
     num_sample_coarse = int(config['num_sample_coarse'])
 
     num_iter = int(config['num_iteration'])
-    batch_size = int(config['batch_size'])
     lr_start = float(config['learning_rate_start'])
     lr_end = float(config['learning_rate_end'])
     model_save_interval = int(config['model_save_interval'])
+    image_save_interval = int(config['image_save_interval'])
     save_image = bool(config['save_image'])
     output_path = config['output_path']
 
@@ -93,16 +94,25 @@ def train():
             for param_group in optimizer.param_groups:
                 param_group['lr'] = get_lr(lr_start, lr_end, cur_iter, num_iter)
 
-            # Save model and example image
+            # Save model
             if cur_iter % model_save_interval == 0:
                 save_model(model_path, model, cur_iter)
                 print('Model saved.')
 
-                if save_image:
-                    example_output = eval_image(example_input)
-                    example_image = to_pil_image(example_output.detach().reshape((H, W, 3)).numpy())
-                    example_image.save(os.path.join(output_path, f'train-iter{cur_iter}.png'), format='PNG')
-                    print('Image saved.')
+            # Save example image
+            if save_image and cur_iter % image_save_interval == 0:
+                example_output = []
+                for start_index in range(0, H*W, batch_size):
+                    end_index = min(start_index + batch_size, H*W)
+                    inputs = example_input[start_index:end_index]
+                    with torch.no_grad():
+                        example_output.append(eval_image(inputs))
+
+                example_output = torch.cat(example_output, 0)
+
+                example_image = to_pil_image(example_output.detach().reshape((H, W, 3)).numpy())
+                example_image.save(os.path.join(output_path, f'train-iter{cur_iter}.png'), format='PNG')
+                print('Image saved.')
 
             # Break infinite loop if the iteration is finished
             if cur_iter >= num_iter:

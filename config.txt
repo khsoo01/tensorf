@@ -2,17 +2,18 @@
 model_path = ./weight/model.pt
 dataset_type = blender
 dataset_path = ./NeRF_Data/nerf_synthetic/chair
+batch_size = 4096
 num_sample_coarse = 64
 
 [train]
 num_iteration = 200000
-batch_size = 4096
 learning_rate_start = 5e-4
 learning_rate_end = 5e-5
 model_save_interval = 400
+image_save_interval = 2000
 save_image = True
 output_path = ./train
 
 [test]
-save_gt = False
+save_gt = True
 output_path = ./output
