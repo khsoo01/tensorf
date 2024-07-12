@@ -18,7 +18,7 @@ def test(dataset: NerfDataset):
     model_path = config['model_path']
     output_path = config['output_path']
     num_sample_coarse = int(config['num_sample_coarse'])
-    save_gt = bool(config['save_gt'])
+    save_gt = (config['save_gt'] == 'True')
 
     # Load dataset arguments
     args = dataset.args

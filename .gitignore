@@ -2,3 +2,4 @@ __pycache__/**
 NeRF_Data/**
 weight/**
 output/**
+train/**
