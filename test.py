@@ -1,6 +1,6 @@
 from nerf_model import NerfModel, load_model
 from nerf_types import NerfDataset
-from nerf_utils import sample_coarse, render
+from nerf_utils import sample, render
 from load_blender import load_blender
 
 import torch
@@ -20,6 +20,7 @@ def test():
     dataset_path = config['dataset_path']
     batch_size = int(config['batch_size'])
     num_sample_coarse = int(config['num_sample_coarse'])
+    num_sample_fine = int(config['num_sample_fine'])
     
     save_gt = (config['save_gt'] == 'True')
     output_path = config['output_path']
@@ -58,11 +59,25 @@ def test():
 
     # Evaluate image from rays using model
     def eval_image(rays: torch.tensor):
-        sample, t_sample = sample_coarse(rays, num_sample_coarse, sample_near, sample_far)
-        sample = sample.to(device)
-        model_outputs = model(sample).to(cpu)
-        pixels = render(t_sample, model_outputs)
-        return pixels
+        sample_c, t_sample_c = sample(rays, num_sample_coarse, sample_near, sample_far)
+
+        model_outputs_c = model(sample_c.to(device)).to(cpu)
+        coarse, weight = render(t_sample_c, model_outputs_c)
+
+        sample_f, t_sample_f = sample(rays, num_sample_fine, sample_near, sample_far, weight)
+
+        # Concatenate [sample_c, sample_f] and sort by t
+        t_sample_f = torch.cat([t_sample_c, t_sample_f], dim=-2)
+        sample_f = torch.cat([sample_c, sample_f], dim=-2)
+        t_sample_f, indices = torch.sort(t_sample_f, dim=-2)
+        indices = torch.broadcast_to(indices, sample_f.shape)
+        sample_f = torch.gather(sample_f, -2, indices)
+
+        model_outputs_f = model(sample_f.to(device)).to(cpu)
+        fine, _ = render(t_sample_f, model_outputs_f)
+
+        return fine
+
 
     for batch_index, batch in enumerate(dataloader):
         inputs, outputs_gt = batch

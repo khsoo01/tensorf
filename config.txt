@@ -4,10 +4,11 @@ dataset_type = blender
 dataset_path = ./NeRF_Data/nerf_synthetic/chair
 batch_size = 4096
 num_sample_coarse = 64
+num_sample_fine = 128
 
 [train]
 num_iteration = 200000
-learning_rate_start = 5e-5
+learning_rate_start = 5e-4
 learning_rate_end = 5e-5
 model_save_interval = 400
 image_save_interval = 2000
