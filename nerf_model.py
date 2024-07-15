@@ -34,15 +34,27 @@ class NerfModel(nn.Module):
         self.pos_enc = PositionalEncodingLayer(l_pos)
         self.dir_enc = PositionalEncodingLayer(l_dir)
 
-        self.fc1 = nn.ModuleList()
-        self.fc1.append(nn.Sequential(nn.Linear(6*l_pos, hidden1),
-                                      nn.ReLU()))
-        for _ in range(7):
-            self.fc1.append(nn.Sequential(nn.Linear(hidden1, hidden1),  
-                                          nn.ReLU()))
+        self.fc1 = nn.Sequential(nn.Linear(6*l_pos, hidden1),
+                                 nn.ReLU(),
+                                 nn.Linear(hidden1, hidden1),  
+                                 nn.ReLU(),
+                                 nn.Linear(hidden1, hidden1),  
+                                 nn.ReLU(),
+                                 nn.Linear(hidden1, hidden1),  
+                                 nn.ReLU(),
+                                 nn.Linear(hidden1, hidden1),  
+                                 nn.ReLU())
+
+        self.fc2 = nn.Sequential(nn.Linear(6*l_pos + hidden1, hidden1),
+                                 nn.ReLU(),
+                                 nn.Linear(hidden1, hidden1),  
+                                 nn.ReLU(),
+                                 nn.Linear(hidden1, hidden1),  
+                                 nn.ReLU())
         
-        self.fc2 = nn.Linear(hidden1, hidden1)
-        self.fc3 = nn.Sequential(nn.Linear(hidden1 + 6*l_dir, hidden2),
+        self.fc3 = nn.Linear(hidden1, hidden1)
+
+        self.fc4 = nn.Sequential(nn.Linear(hidden1 + 6*l_dir, hidden2),
                                  nn.ReLU())
         
         self.out_density = nn.Sequential(nn.Linear(hidden1, 1),
@@ -56,15 +68,19 @@ class NerfModel(nn.Module):
         input_pos = input[..., :3]
         input_dir = input[..., 3:]
 
-        x = self.pos_enc(input_pos)
-        for fc in self.fc1:
-            x = fc(x)
+        pos_e = self.pos_enc(input_pos)
+        dir_e = self.dir_enc(input_dir)
+        
+        x = pos_e
+        x = self.fc1(x)
+        x = torch.cat((pos_e, x), -1)
+        x = self.fc2(x)
 
         output_density = self.out_density(x)
-        
-        x = self.fc2(x)
-        x = torch.cat((self.dir_enc(input_dir), x), -1)
+
         x = self.fc3(x)
+        x = torch.cat((dir_e, x), -1)
+        x = self.fc4(x)
 
         output_color = self.out_color(x)
         
