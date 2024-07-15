@@ -96,7 +96,9 @@ def train():
 
             # Save model
             if cur_iter % model_save_interval == 0:
+                model.to(cpu)
                 save_model(model_path, model, cur_iter)
+                model.to(device)
                 print('Model saved.')
 
             # Save example image
