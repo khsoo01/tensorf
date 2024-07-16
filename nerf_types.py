@@ -34,3 +34,7 @@ class NerfDataset(Dataset):
         else:
             self.rays = torch.cat((self.rays, other.rays))
             self.colors = torch.cat((self.colors, other.colors))
+
+    def subset (self, indices):
+        selected_rays, selected_colors = self[indices]
+        return NerfDataset(args=self.args, rays=selected_rays, colors=selected_colors)

@@ -20,11 +20,14 @@ def train():
     model_path = config['model_path']
     dataset_type = config['dataset_type']
     dataset_path = config['dataset_path']
+    resolution_ratio = float(config['resolution_ratio'])
     batch_size = int(config['batch_size'])
     num_sample_coarse = int(config['num_sample_coarse'])
     num_sample_fine = int(config['num_sample_fine'])
 
     num_iter = int(config['num_iteration'])
+    precrop_iter = int(config['precrop_iteration'])
+    precrop_frac = float(config['precrop_fraction'])
     lr_start = float(config['learning_rate_start'])
     lr_end = float(config['learning_rate_end'])
     model_save_interval = int(config['model_save_interval'])
@@ -34,7 +37,7 @@ def train():
 
     # Load dataset
     if dataset_type == 'blender':
-        dataset = load_blender(dataset_path)['train']
+        dataset = load_blender(dataset_path, resolution_ratio)['train']
     else:
         print('Invalid dataset type. Aborting.')
         exit(0)
@@ -61,7 +64,6 @@ def train():
     
     model, cur_iter = load_model(model_path)
     model = model.to(device)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     optimizer = optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
 
     # Setup example input and ground truth image from the input
@@ -91,53 +93,74 @@ def train():
 
         return coarse, fine
 
-    while True:
+    def train_batch(batch: torch.tensor):
+        nonlocal cur_iter
+
+        print(f'Training: iteration {cur_iter}.')
+        # Evaluate image from batch input and backpropagate loss
+        inputs, outputs = batch
+        
+        coarse, fine = eval_image(inputs)
+        mse_loss = nn.MSELoss()
+        loss = mse_loss(coarse, outputs) + mse_loss(fine, outputs)
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+
+        cur_iter += 1
+
+        # Update learning rate
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = get_lr(lr_start, lr_end, cur_iter, num_iter)
+
+        # Save model
+        if cur_iter % model_save_interval == 0:
+            model.to(cpu)
+            save_model(model_path, model, cur_iter)
+            model.to(device)
+            print('Model saved.')
+
+        # Save example image
+        if save_image and cur_iter % image_save_interval == 0:
+            example_output = []
+            for start_index in range(0, H*W, batch_size):
+                end_index = min(start_index + batch_size, H*W)
+                inputs = example_input[start_index:end_index]
+                with torch.no_grad():
+                    _, image = eval_image(inputs)
+                    example_output.append(image)
+
+            example_output = torch.cat(example_output, 0)
+
+            example_image = to_pil_image(example_output.detach().reshape((H, W, 3)).numpy())
+            example_image.save(os.path.join(output_path, f'train-iter{cur_iter}.png'), format='PNG')
+            print('Image saved.')
+
+    if precrop_iter > 0:
+        num_image = len(dataset) // (W*H)
+        dW = int(W//2 * precrop_frac)
+        dH = int(H//2 * precrop_frac)
+        W_range = range(W//2 - dW, W//2 + dW)
+        H_range = range(H//2 - dH, H//2 + dH)
+        precrop_indices = [ k*(H*W) + i*W + j for k in range(num_image) 
+                                              for i in H_range
+                                              for j in W_range ]
+        precrop_dataset = dataset.subset(precrop_indices)
+        precrop_dataloader = torch.utils.data.DataLoader(precrop_dataset, batch_size=batch_size, shuffle=True)
+
+        while cur_iter < precrop_iter:
+            for batch in precrop_dataloader:
+                train_batch(batch)
+                if cur_iter >= precrop_iter:
+                    break
+
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    while cur_iter < num_iter:
         for batch in dataloader:
-            print(f'Training: iteration {cur_iter}.')
-            # Evaluate image from batch input and backpropagate loss
-            inputs, outputs = batch
-            
-            coarse, fine = eval_image(inputs)
-            mse_loss = nn.MSELoss()
-            loss = mse_loss(coarse, outputs) + mse_loss(fine, outputs)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-
-            cur_iter += 1
-
-            # Update learning rate
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = get_lr(lr_start, lr_end, cur_iter, num_iter)
-
-            # Save model
-            if cur_iter % model_save_interval == 0:
-                model.to(cpu)
-                save_model(model_path, model, cur_iter)
-                model.to(device)
-                print('Model saved.')
-
-            # Save example image
-            if save_image and cur_iter % image_save_interval == 0:
-                example_output = []
-                for start_index in range(0, H*W, batch_size):
-                    end_index = min(start_index + batch_size, H*W)
-                    inputs = example_input[start_index:end_index]
-                    with torch.no_grad():
-                        _, image = eval_image(inputs)
-                        example_output.append(image)
-
-                example_output = torch.cat(example_output, 0)
-
-                example_image = to_pil_image(example_output.detach().reshape((H, W, 3)).numpy())
-                example_image.save(os.path.join(output_path, f'train-iter{cur_iter}.png'), format='PNG')
-                print('Image saved.')
-
-            # Break infinite loop if the iteration is finished
+            train_batch(batch)
             if cur_iter >= num_iter:
                 break
-        if cur_iter >= num_iter:
-            break
 
 if __name__ == '__main__':
     train()
