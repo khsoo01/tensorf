@@ -7,17 +7,23 @@ import torch
 from torchvision.transforms.functional import to_pil_image
 
 import configparser
+import sys
 import os
 
-def test():
+def test(config_path: str = None):
+    config_paths = ['config_default.txt']
+    if config_path is not None:
+        config_paths.append(config_path)
+
     # Load config
     config = configparser.ConfigParser()
-    config.read('config.txt')
+    config.read(config_paths)
     config = dict(config['general']) | dict(config['test'])
 
     model_path = config['model_path']
     dataset_type = config['dataset_type']
     dataset_path = config['dataset_path']
+    resolution_ratio = float(config['resolution_ratio'])
     batch_size = int(config['batch_size'])
     num_sample_coarse = int(config['num_sample_coarse'])
     num_sample_fine = int(config['num_sample_fine'])
@@ -25,9 +31,26 @@ def test():
     save_gt = (config['save_gt'] == 'True')
     output_path = config['output_path']
 
+    print(f'Loaded config from {config_paths}.')
+
+    # Make sure that directories in file paths exist
+    def create_directories(path: str):
+        extension = os.path.splitext(path)[1]
+        if len(extension) > 0:
+            directory_path = os.path.dirname(path)
+        else:
+            directory_path = path
+        try:
+            os.makedirs(directory_path, exist_ok=True)
+        except Exception as e:
+            print(f"Error occurred while makedirs: {e}")
+
+    for path in [model_path, output_path]:
+        create_directories(path)
+
     # Load dataset
     if dataset_type == 'blender':
-        dataset = load_blender(dataset_path)['test']
+        dataset = load_blender(dataset_path, resolution_ratio)['test']
     else:
         print('Invalid dataset type. Aborting.')
         exit(0)
@@ -100,4 +123,5 @@ def test():
         print(f'Image saved: {batch_index}')
 
 if __name__ == '__main__':
-    test()
+    config_path = sys.argv[1] if len(sys.argv) > 1 else None
+    test(config_path)

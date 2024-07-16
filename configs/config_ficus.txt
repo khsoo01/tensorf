@@ -1,0 +1,14 @@
+[general]
+model_path = ./weight/model-ficus.pt
+dataset_type = blender
+dataset_path = ./NeRF_Data/nerf_synthetic/ficus
+resolution_ratio = 0.5
+batch_size = 1024
+
+[train]
+precrop_iteration = 500
+precrop_fraction = 0.5
+output_path = ./train/ficus
+
+[test]
+output_path = ./output/ficus

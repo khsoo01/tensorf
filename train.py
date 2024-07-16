@@ -9,12 +9,17 @@ import torch.optim as optim
 from torchvision.transforms.functional import to_pil_image
 
 import configparser
+import sys
 import os
 
-def train():
+def train(config_path: str = None):
+    config_paths = ['config_default.txt']
+    if config_path is not None:
+        config_paths.append(config_path)
+
     # Load config
     config = configparser.ConfigParser()
-    config.read('config.txt')
+    config.read(config_paths)
     config = dict(config['general']) | dict(config['train'])
 
     model_path = config['model_path']
@@ -34,6 +39,23 @@ def train():
     image_save_interval = int(config['image_save_interval'])
     save_image = bool(config['save_image'])
     output_path = config['output_path']
+
+    print(f'Loaded config from {config_paths}.')
+
+    # Make sure that directories in file paths exist
+    def create_directories(path: str):
+        extension = os.path.splitext(path)[1]
+        if len(extension) > 0:
+            directory_path = os.path.dirname(path)
+        else:
+            directory_path = path
+        try:
+            os.makedirs(directory_path, exist_ok=True)
+        except Exception as e:
+            print(f"Error occurred while makedirs: {e}")
+
+    for path in [model_path, output_path]:
+        create_directories(path)
 
     # Load dataset
     if dataset_type == 'blender':
@@ -163,4 +185,5 @@ def train():
                 break
 
 if __name__ == '__main__':
-    train()
+    config_path = sys.argv[1] if len(sys.argv) > 1 else None
+    train(config_path)
