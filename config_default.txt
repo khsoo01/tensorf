@@ -18,4 +18,5 @@ output_path = ./train
 
 [test]
 save_gt = True
+make_gif = True
 output_path = ./output

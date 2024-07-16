@@ -29,6 +29,7 @@ def test(config_path: str = None):
     num_sample_fine = int(config['num_sample_fine'])
     
     save_gt = (config['save_gt'] == 'True')
+    make_gif = (config['make_gif'] == 'True')
     output_path = config['output_path']
 
     print(f'Loaded config from {config_paths}.')
@@ -101,6 +102,8 @@ def test(config_path: str = None):
 
         return fine
 
+    images = []
+    images_gt = []
 
     for batch_index, batch in enumerate(dataloader):
         inputs, outputs_gt = batch
@@ -114,13 +117,33 @@ def test(config_path: str = None):
         outputs = torch.cat(outputs, 0)
 
         image = to_pil_image(outputs.detach().reshape((H, W, 3)).numpy())
+        images.append(image)
         image.save(os.path.join(output_path, f'output{batch_index}.png'), format='PNG')
 
         if save_gt:
             image = to_pil_image(outputs_gt.detach().reshape((H, W, 3)).numpy())
+            images_gt.append(image)
             image.save(os.path.join(output_path, f'output{batch_index}-gt.png'), format='PNG')
 
         print(f'Image saved: {batch_index}')
+
+    if make_gif:
+        images[0].save(
+            os.path.join(output_path, 'animated.gif'),
+            save_all=True,
+            append_images=images[1:],
+            duration=0.1,  # Duration between frames in milliseconds
+            loop=0  # Loop forever
+        )
+
+        if save_gt:
+            images_gt[0].save(
+                os.path.join(output_path, 'animated-gt.gif'),
+                save_all=True,
+                append_images=images_gt[1:],
+                duration=0.1,
+                loop=0
+            )
 
 if __name__ == '__main__':
     config_path = sys.argv[1] if len(sys.argv) > 1 else None
