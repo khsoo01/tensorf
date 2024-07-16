@@ -76,16 +76,18 @@ def test(config_path: str = None):
         print('Device: cpu')
         device = cpu
     
-    model, _ = load_model(model_path)
-    model.eval()
-    model = model.to(device)
+    model_coarse, model_fine, _ = load_model(model_path)
+    model_coarse = model_coarse.to(device)
+    model_fine = model_fine.to(device)
+    model_coarse.eval()
+    model_fine.eval()
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=H*W, shuffle=False)
 
     # Evaluate image from rays using model
     def eval_image(rays: torch.tensor):
         sample_c, t_sample_c = sample(rays, num_sample_coarse, sample_near, sample_far)
 
-        model_outputs_c = model(sample_c.to(device)).to(cpu)
+        model_outputs_c = model_coarse(sample_c.to(device)).to(cpu)
         coarse, weight = render(t_sample_c, model_outputs_c)
 
         sample_f, t_sample_f = sample(rays, num_sample_fine, sample_near, sample_far, weight)
@@ -97,7 +99,7 @@ def test(config_path: str = None):
         indices = torch.broadcast_to(indices, sample_f.shape)
         sample_f = torch.gather(sample_f, -2, indices)
 
-        model_outputs_f = model(sample_f.to(device)).to(cpu)
+        model_outputs_f = model_fine(sample_f.to(device)).to(cpu)
         fine, _ = render(t_sample_f, model_outputs_f)
 
         return fine

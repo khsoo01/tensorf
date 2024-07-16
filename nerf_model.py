@@ -88,18 +88,19 @@ class NerfModel(nn.Module):
         return output
 
 
-def save_model (path: str, model: NerfModel, num_iter: int):
+def save_model (path: str, model_coarse: NerfModel, model_fine: NerfModel, num_iter: int):
     model_state = {
-        'state_dict': model.state_dict(),
-        'l_pos': model.l_pos,
-        'l_dir': model.l_dir,
-        'hidden1': model.hidden1,
-        'hidden2': model.hidden2,
+        'state_dict_coarse': model_coarse.state_dict(),
+        'state_dict_fine': model_fine.state_dict(),
+        'l_pos': model_fine.l_pos,
+        'l_dir': model_fine.l_dir,
+        'hidden1': model_fine.hidden1,
+        'hidden2': model_fine.hidden2,
         'num_iter': num_iter
     }
     torch.save(model_state, path)
 
-def load_model (path: str) -> NerfModel:
+def load_model (path: str) -> (NerfModel, NerfModel, int):
     if os.path.exists(path):
         model_state = torch.load(path)
 
@@ -108,12 +109,16 @@ def load_model (path: str) -> NerfModel:
         hidden1 = model_state['hidden1']
         hidden2 = model_state['hidden2']
 
-        model = NerfModel(l_pos, l_dir, hidden1, hidden2)
-        model.load_state_dict(model_state['state_dict'])
+        model_coarse = NerfModel(l_pos, l_dir, hidden1, hidden2)
+        model_coarse.load_state_dict(model_state['state_dict_coarse'])
+
+        model_fine = NerfModel(l_pos, l_dir, hidden1, hidden2)
+        model_fine.load_state_dict(model_state['state_dict_fine'])
 
         num_iter = model_state['num_iter']
     else:
-        model = NerfModel()
+        model_coarse = NerfModel()
+        model_fine = NerfModel()
         num_iter = 0
 
-    return model, num_iter
+    return model_coarse, model_fine, num_iter

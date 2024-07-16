@@ -84,9 +84,11 @@ def train(config_path: str = None):
         print('Device: cpu')
         device = cpu
     
-    model, cur_iter = load_model(model_path)
-    model = model.to(device)
-    optimizer = optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
+    model_coarse, model_fine, cur_iter = load_model(model_path)
+    model_coarse = model_coarse.to(device)
+    model_fine = model_fine.to(device)
+    grad_vars = list(model_coarse.parameters()) + list(model_fine.parameters())
+    optimizer = optim.Adam(grad_vars, lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
 
     # Setup example input and ground truth image from the input
     if save_image:
@@ -98,7 +100,7 @@ def train(config_path: str = None):
     def eval_image(rays: torch.tensor):
         sample_c, t_sample_c = sample(rays, num_sample_coarse, sample_near, sample_far)
 
-        model_outputs_c = model(sample_c.to(device)).to(cpu)
+        model_outputs_c = model_coarse(sample_c.to(device)).to(cpu)
         coarse, weight = render(t_sample_c, model_outputs_c)
 
         sample_f, t_sample_f = sample(rays, num_sample_fine, sample_near, sample_far, weight)
@@ -110,7 +112,7 @@ def train(config_path: str = None):
         indices = torch.broadcast_to(indices, sample_f.shape)
         sample_f = torch.gather(sample_f, -2, indices)
 
-        model_outputs_f = model(sample_f.to(device)).to(cpu)
+        model_outputs_f = model_fine(sample_f.to(device)).to(cpu)
         fine, _ = render(t_sample_f, model_outputs_f)
 
         return coarse, fine
@@ -137,9 +139,11 @@ def train(config_path: str = None):
 
         # Save model
         if cur_iter % model_save_interval == 0:
-            model.to(cpu)
-            save_model(model_path, model, cur_iter)
-            model.to(device)
+            model_coarse.to(cpu)
+            model_fine.to(cpu)
+            save_model(model_path, model_coarse, model_fine, cur_iter)
+            model_coarse.to(device)
+            model_fine.to(device)
             print('Model saved.')
 
         # Save example image
