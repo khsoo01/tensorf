@@ -70,6 +70,7 @@ def train(config_path: str = None):
     H = args.height
     sample_near = args.near
     sample_far = args.far
+    max_coord = args.max_coord
 
     # Start training
     cpu = torch.device('cpu')
@@ -99,11 +100,15 @@ def train(config_path: str = None):
     # Evaluate image from rays using model
     def eval_image(rays: torch.tensor):
         sample_c, t_sample_c = sample(rays, num_sample_coarse, sample_near, sample_far)
+        # Normalize sample positions to be in [-1, 1] (for positional encoding)
+        sample_c[..., :3] /= max_coord
 
         model_outputs_c = model_coarse(sample_c.to(device)).to(cpu)
         coarse, weight = render(t_sample_c, model_outputs_c)
 
         sample_f, t_sample_f = sample(rays, num_sample_fine, sample_near, sample_far, weight)
+        # Normalize sample positions to be in [-1, 1] (for positional encoding)
+        sample_f[..., :3] /= max_coord
 
         # Concatenate [sample_c, sample_f] and sort by t
         t_sample_f = torch.cat([t_sample_c, t_sample_f], dim=-2)

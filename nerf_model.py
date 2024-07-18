@@ -68,7 +68,7 @@ class NerfModel(nn.Module):
         input_pos = input[..., :3]
         input_dir = input[..., 3:]
 
-        pos_e = self.pos_enc(input_pos/4)
+        pos_e = self.pos_enc(input_pos)
         dir_e = self.dir_enc(input_dir)
         
         x = pos_e

@@ -2,17 +2,19 @@ import torch
 from torch.utils.data import Dataset
 
 class NerfDatasetArgs:
-    def __init__(self, width: int, height: int, near: float, far: float):
+    def __init__(self, width: int, height: int, near: float, far: float, max_coord: float):
         self.width = width
         self.height = height
         self.near = near
         self.far = far
+        self.max_coord = max_coord
 
     def __eq__(self, other):
         return (self.width == other.width and
                 self.height == other.height and
                 self.near == other.near and
-                self.far == other.far)
+                self.far == other.far and
+                self.max_coord == other.max_coord)
 
 class NerfDataset(Dataset):
     def __init__(self, args: NerfDatasetArgs, rays = torch.tensor([]), colors = torch.tensor([])):
