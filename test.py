@@ -4,6 +4,7 @@ from nerf_utils import sample, render
 from load_blender import load_blender
 
 import torch
+import torch.nn as nn
 from torchvision.transforms.functional import to_pil_image
 
 import configparser
@@ -122,6 +123,13 @@ def test(config_path: str = None):
                 outputs.append(eval_image(inputs[start_index:end_index]))
         
         outputs = torch.cat(outputs, 0)
+        
+        mse_loss = nn.MSELoss()
+        mse = mse_loss(outputs, outputs_gt)
+        if mse == 0:
+            psnr = float('inf')
+        else:
+            psnr = (-10.0 * torch.log(mse) / torch.log(torch.Tensor([10.0]))).item()
 
         image = to_pil_image(outputs.detach().reshape((H, W, 3)).numpy())
         images.append(image)
@@ -132,7 +140,7 @@ def test(config_path: str = None):
             images_gt.append(image)
             image.save(os.path.join(output_path, f'output{batch_index}-gt.png'), format='PNG')
 
-        print(f'Image saved: {batch_index}')
+        print(f'Image saved: {batch_index}. (psnr={psnr})')
 
     if make_gif:
         images[0].save(
