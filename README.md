@@ -20,3 +20,8 @@ python3 train.py configs/config_chair.txt
 ```
 python3 test.py configs/config_chair.txt
 ```
+
+# Result Examples
+![Chair](images/animated-chair.gif)
+![Hotdog](images/animated-hotdog.gif)
+![Lego](images/animated-lego.gif)
