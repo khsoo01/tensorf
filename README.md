@@ -1,11 +1,16 @@
 # NeRF
-NeRF implementation for practice
+NeRF implementation using PyTorch
 
 # Installation
 ```
 git clone https://github.com/khsoo01/nerf.git
 cd nerf
 pip install -r requirements.txt
+```
+
+To download example data,
+```
+bash download_example_data.sh
 ```
 
 # How to run
