@@ -26,8 +26,6 @@ def test(config_path: str = None):
     dataset_path = config['dataset_path']
     resolution_ratio = float(config['resolution_ratio'])
     batch_size = int(config['batch_size'])
-    num_sample_coarse = int(config['num_sample_coarse'])
-    num_sample_fine = int(config['num_sample_fine'])
     
     save_gt = (config['save_gt'] == 'True')
     make_gif = (config['make_gif'] == 'True')
@@ -78,37 +76,14 @@ def test(config_path: str = None):
         print('Device: cpu')
         device = cpu
     
-    model_coarse, model_fine, _ = load_model(model_path)
-    model_coarse = model_coarse.to(device)
-    model_fine = model_fine.to(device)
-    model_coarse.eval()
-    model_fine.eval()
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=H*W, shuffle=False)
+    # TODO Model, DataLoader declaration
+    model = None
+    dataloader = None
 
     # Evaluate image from rays using model
     def eval_image(rays: torch.tensor):
-        sample_c, t_sample_c = sample(rays, num_sample_coarse, sample_near, sample_far)
-        # Normalize sample positions to be in [-1, 1] (for positional encoding)
-        sample_c[..., :3] /= max_coord
-
-        model_outputs_c = model_coarse(sample_c.to(device)).to(cpu)
-        coarse, weight = render(t_sample_c, model_outputs_c)
-
-        sample_f, t_sample_f = sample(rays, num_sample_fine, sample_near, sample_far, weight)
-        # Normalize sample positions to be in [-1, 1] (for positional encoding)
-        sample_f[..., :3] /= max_coord
-
-        # Concatenate [sample_c, sample_f] and sort by t
-        t_sample_f = torch.cat([t_sample_c, t_sample_f], dim=-2)
-        sample_f = torch.cat([sample_c, sample_f], dim=-2)
-        t_sample_f, indices = torch.sort(t_sample_f, dim=-2)
-        indices = torch.broadcast_to(indices, sample_f.shape)
-        sample_f = torch.gather(sample_f, -2, indices)
-
-        model_outputs_f = model_fine(sample_f.to(device)).to(cpu)
-        fine, _ = render(t_sample_f, model_outputs_f)
-
-        return fine
+        # TODO Evaluate pixel value of rays
+        return None
 
     images = []
     images_gt = []

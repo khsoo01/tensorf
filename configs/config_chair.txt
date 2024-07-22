@@ -3,11 +3,8 @@ model_path = ./weight/model-chair.pt
 dataset_type = blender
 dataset_path = ./NeRF_Data/nerf_synthetic/chair
 resolution_ratio = 0.5
-batch_size = 1024
 
 [train]
-precrop_iteration = 500
-precrop_fraction = 0.5
 output_path = ./train/chair
 
 [test]

@@ -27,14 +27,8 @@ def train(config_path: str = None):
     dataset_path = config['dataset_path']
     resolution_ratio = float(config['resolution_ratio'])
     batch_size = int(config['batch_size'])
-    num_sample_coarse = int(config['num_sample_coarse'])
-    num_sample_fine = int(config['num_sample_fine'])
 
     num_iter = int(config['num_iteration'])
-    precrop_iter = int(config['precrop_iteration'])
-    precrop_frac = float(config['precrop_fraction'])
-    lr_start = float(config['learning_rate_start'])
-    lr_end = float(config['learning_rate_end'])
     model_save_interval = int(config['model_save_interval'])
     image_save_interval = int(config['image_save_interval'])
     save_image = bool(config['save_image'])
@@ -84,12 +78,11 @@ def train(config_path: str = None):
     else:
         print('Device: cpu')
         device = cpu
-    
-    model_coarse, model_fine, cur_iter = load_model(model_path)
-    model_coarse = model_coarse.to(device)
-    model_fine = model_fine.to(device)
-    grad_vars = list(model_coarse.parameters()) + list(model_fine.parameters())
-    optimizer = optim.Adam(grad_vars, lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
+
+    # TODO Model, DataLoader, Optimizer declaration
+    model = None
+    dataloader = None
+    optimizer = None
 
     # Setup example input and ground truth image from the input
     if save_image:
@@ -99,28 +92,8 @@ def train(config_path: str = None):
 
     # Evaluate image from rays using model
     def eval_image(rays: torch.tensor):
-        sample_c, t_sample_c = sample(rays, num_sample_coarse, sample_near, sample_far)
-        # Normalize sample positions to be in [-1, 1] (for positional encoding)
-        sample_c[..., :3] /= max_coord
-
-        model_outputs_c = model_coarse(sample_c.to(device)).to(cpu)
-        coarse, weight = render(t_sample_c, model_outputs_c)
-
-        sample_f, t_sample_f = sample(rays, num_sample_fine, sample_near, sample_far, weight)
-        # Normalize sample positions to be in [-1, 1] (for positional encoding)
-        sample_f[..., :3] /= max_coord
-
-        # Concatenate [sample_c, sample_f] and sort by t
-        t_sample_f = torch.cat([t_sample_c, t_sample_f], dim=-2)
-        sample_f = torch.cat([sample_c, sample_f], dim=-2)
-        t_sample_f, indices = torch.sort(t_sample_f, dim=-2)
-        indices = torch.broadcast_to(indices, sample_f.shape)
-        sample_f = torch.gather(sample_f, -2, indices)
-
-        model_outputs_f = model_fine(sample_f.to(device)).to(cpu)
-        fine, _ = render(t_sample_f, model_outputs_f)
-
-        return coarse, fine
+        # TODO Evaluate pixel value of rays
+        return None
 
     def train_batch(batch: torch.tensor):
         nonlocal cur_iter
@@ -129,27 +102,18 @@ def train(config_path: str = None):
         # Evaluate image from batch input and backpropagate loss
         inputs, outputs = batch
         
-        coarse, fine = eval_image(inputs)
-        mse_loss = nn.MSELoss()
-        loss = mse_loss(coarse, outputs) + mse_loss(fine, outputs)
+        # TODO Evaluate model output and loss
+        loss = None
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
 
         cur_iter += 1
 
-        # Update learning rate
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = get_lr(lr_start, lr_end, cur_iter, num_iter)
-
         # Save model
         if cur_iter % model_save_interval == 0:
-            model_coarse.to(cpu)
-            model_fine.to(cpu)
-            save_model(model_path, model_coarse, model_fine, cur_iter)
-            model_coarse.to(device)
-            model_fine.to(device)
-            print('Model saved.')
+            # TODO Save model
+            pass
 
         # Save example image
         if save_image and cur_iter % image_save_interval == 0:
@@ -158,7 +122,7 @@ def train(config_path: str = None):
                 end_index = min(start_index + batch_size, H*W)
                 inputs = example_input[start_index:end_index]
                 with torch.no_grad():
-                    _, image = eval_image(inputs)
+                    image = eval_image(inputs)
                     example_output.append(image)
 
             example_output = torch.cat(example_output, 0)
@@ -166,26 +130,6 @@ def train(config_path: str = None):
             example_image = to_pil_image(example_output.detach().reshape((H, W, 3)).numpy())
             example_image.save(os.path.join(output_path, f'train-iter{cur_iter}.png'), format='PNG')
             print('Image saved.')
-
-    if precrop_iter > 0:
-        num_image = len(dataset) // (W*H)
-        dW = int(W//2 * precrop_frac)
-        dH = int(H//2 * precrop_frac)
-        W_range = range(W//2 - dW, W//2 + dW)
-        H_range = range(H//2 - dH, H//2 + dH)
-        precrop_indices = [ k*(H*W) + i*W + j for k in range(num_image) 
-                                              for i in H_range
-                                              for j in W_range ]
-        precrop_dataset = dataset.subset(precrop_indices)
-        precrop_dataloader = torch.utils.data.DataLoader(precrop_dataset, batch_size=batch_size, shuffle=True)
-
-        while cur_iter < precrop_iter:
-            for batch in precrop_dataloader:
-                train_batch(batch)
-                if cur_iter >= precrop_iter:
-                    break
-
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     while cur_iter < num_iter:
         for batch in dataloader:
