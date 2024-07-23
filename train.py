@@ -1,4 +1,4 @@
-from nerf_model import NerfModel, load_model, save_model
+from tensorf_model import TensorfModel, load_model, save_model
 from nerf_types import NerfDataset
 from nerf_utils import get_lr, sample, render
 from load_blender import load_blender
@@ -27,8 +27,11 @@ def train(config_path: str = None):
     dataset_path = config['dataset_path']
     resolution_ratio = float(config['resolution_ratio'])
     batch_size = int(config['batch_size'])
+    num_sample = int(config['num_sample'])
 
     num_iter = int(config['num_iteration'])
+    lr_start = float(config['learning_rate_start'])
+    lr_end = float(config['learning_rate_end'])
     model_save_interval = int(config['model_save_interval'])
     image_save_interval = int(config['image_save_interval'])
     save_image = bool(config['save_image'])
@@ -79,10 +82,10 @@ def train(config_path: str = None):
         print('Device: cpu')
         device = cpu
 
-    # TODO Model, DataLoader, Optimizer declaration
-    model = None
-    dataloader = None
-    optimizer = None
+    model, cur_iter = load_model(model_path)
+    model = model.to(device)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    optimizer = optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
 
     # Setup example input and ground truth image from the input
     if save_image:
@@ -92,8 +95,14 @@ def train(config_path: str = None):
 
     # Evaluate image from rays using model
     def eval_image(rays: torch.tensor):
-        # TODO Evaluate pixel value of rays
-        return None
+        samples, t_samples = sample(rays, num_sample, sample_near, sample_far)
+        # Normalize sample positions to be in [-1, 1] (for positional encoding)
+        samples[..., :3] /= max_coord
+
+        model_outputs = model(samples.to(device)).to(cpu)
+        image, _ = render(t_samples, model_outputs)
+
+        return image
 
     def train_batch(batch: torch.tensor):
         nonlocal cur_iter
@@ -102,18 +111,25 @@ def train(config_path: str = None):
         # Evaluate image from batch input and backpropagate loss
         inputs, outputs = batch
         
-        # TODO Evaluate model output and loss
-        loss = None
+        image = eval_image(inputs)
+        mse_loss = nn.MSELoss()
+        loss = mse_loss(image, outputs)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
 
         cur_iter += 1
 
+        # Update learning rate
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = get_lr(lr_start, lr_end, cur_iter, num_iter)
+
         # Save model
         if cur_iter % model_save_interval == 0:
-            # TODO Save model
-            pass
+            model.to(cpu)
+            save_model(model_path, model, cur_iter)
+            model.to(device)
+            print('Model saved.')
 
         # Save example image
         if save_image and cur_iter % image_save_interval == 0:

@@ -26,6 +26,7 @@ def test(config_path: str = None):
     dataset_path = config['dataset_path']
     resolution_ratio = float(config['resolution_ratio'])
     batch_size = int(config['batch_size'])
+    num_sample = int(config['num_sample'])
     
     save_gt = (config['save_gt'] == 'True')
     make_gif = (config['make_gif'] == 'True')
@@ -76,14 +77,21 @@ def test(config_path: str = None):
         print('Device: cpu')
         device = cpu
     
-    # TODO Model, DataLoader declaration
-    model = None
-    dataloader = None
+    model, _ = load_model(model_path)
+    model = model.to(device)
+    model.eval()
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=H*W, shuffle=False)
 
     # Evaluate image from rays using model
     def eval_image(rays: torch.tensor):
-        # TODO Evaluate pixel value of rays
-        return None
+        samples, t_samples = sample(rays, num_sample, sample_near, sample_far)
+        # Normalize sample positions to be in [-1, 1] (for positional encoding)
+        samples[..., :3] /= max_coord
+
+        model_outputs = model(samples.to(device)).to(cpu)
+        image, _ = render(t_samples, model_outputs)
+
+        return image
 
     images = []
     images_gt = []
