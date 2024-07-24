@@ -64,14 +64,14 @@ class TensorfVM(nn.Module):
         return output
 
 class TensorfModel(nn.Module):
-    def __init__(self, grid_size=200, comp_c=24, comp_d=8, feature_dim=27, hidden_dim=128, pe_dim=6):
+    def __init__(self, grid_size=300, comp_c=48, comp_d=16, feature_dim=27, hidden_dim=128, pe_dim=2):
         super(TensorfModel, self).__init__()
 
         self.vm_c = TensorfVM(grid_size, comp_c)
         self.vm_d = TensorfVM(grid_size, comp_d)
 
         self.feat = nn.Linear(3*comp_c, feature_dim)
-        self.mlp = nn.Sequential(nn.Linear(feature_dim+3+12*pe_dim, hidden_dim),
+        self.mlp = nn.Sequential(nn.Linear((1+2*pe_dim)*(3+feature_dim), hidden_dim),
                                  nn.ReLU(),
                                  nn.Linear(hidden_dim, hidden_dim),
                                  nn.ReLU(),
@@ -89,7 +89,7 @@ class TensorfModel(nn.Module):
         # Evaluate Color
         feature = self.feat(self.vm_c(position))
 
-        mlp_input = [feature, direction, self.pe(position), self.pe(direction)]
+        mlp_input = [feature, direction, self.pe(feature), self.pe(direction)]
         mlp_input = torch.cat(mlp_input, -1)
         color = self.mlp(mlp_input)
 

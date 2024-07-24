@@ -2,14 +2,14 @@
 model_path = ./weight/model.pt
 resolution_ratio = 1.0
 batch_size = 4096
-num_sample = 256
+num_sample = 512
 
 [train]
 num_iteration = 200000
 learning_rate_start = 2e-2
 learning_rate_end = 1e-3
-model_save_interval = 400
-image_save_interval = 2000
+model_save_interval = 200
+image_save_interval = 1000
 save_image = True
 output_path = ./train
 
