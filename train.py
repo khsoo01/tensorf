@@ -32,6 +32,9 @@ def train(config_path: str = None):
     num_iter = int(config['num_iteration'])
     lr_start = float(config['learning_rate_start'])
     lr_end = float(config['learning_rate_end'])
+    grid_size_start = float(config['grid_size_start'])
+    grid_size_end = float(config['grid_size_end'])
+    grid_size_steps = eval(config['grid_size_steps'])
     model_save_interval = int(config['model_save_interval'])
     image_save_interval = int(config['image_save_interval'])
     save_image = bool(config['save_image'])
@@ -84,6 +87,9 @@ def train(config_path: str = None):
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
     optimizer = optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
 
+    if cur_iter == 0:
+        model.reset_grid_size(grid_size_start)
+
     # Setup example input and ground truth image from the input
     if save_image:
         example_input, example_output_gt = dataset[0:H*W]
@@ -120,6 +126,13 @@ def train(config_path: str = None):
         # Update learning rate
         for param_group in optimizer.param_groups:
             param_group['lr'] = get_lr(lr_start, lr_end, cur_iter, num_iter)
+
+        # Update grid size if needed
+        if cur_iter in grid_size_steps:
+            # Using get_lr since the calculation is same
+            new_grid_size = int(get_lr(grid_size_start, grid_size_end, grid_size_steps.index(cur_iter)+1, len(grid_size_steps)))
+            model.reset_grid_size(new_grid_size)
+            print(f'Grid size updated to {new_grid_size}.')
 
         # Save model
         if cur_iter % model_save_interval == 0:

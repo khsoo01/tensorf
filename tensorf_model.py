@@ -38,6 +38,11 @@ class TensorfVM(nn.Module):
         self.vectors = make_param((3, R, N, 1))
         self.matrices = make_param((3, R, N, N))
 
+    def reset_grid_size(self, grid_size):
+        self.N = grid_size
+        self.vectors = nn.Upsample(size=[grid_size, 1], mode='bilinear')
+        self.matrices = nn.Upsample(size=[grid_size, grid_size], mode='bilinear')
+
     def forward(self, input):
         #  input: [B, S, 3] 3D cartesian coordinate (X, Y, Z)
         # output: [B, S, 3*R] Feature
@@ -78,7 +83,11 @@ class TensorfModel(nn.Module):
                                  nn.Linear(hidden_dim, 3),
                                  nn.Sigmoid())
 
-        self.pe = PositionalEncodingLayer(pe_dim)        
+        self.pe = PositionalEncodingLayer(pe_dim)
+
+    def reset_grid_size(self, grid_size):
+        self.vm_c.reset_grid_size(grid_size)
+        self.vm_d.reset_grid_size(grid_size)
 
     def forward(self, input):
         #  input: [B, S, 6] (Position, Direction)
