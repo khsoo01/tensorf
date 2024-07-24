@@ -40,8 +40,8 @@ class TensorfVM(nn.Module):
 
     def reset_grid_size(self, grid_size):
         self.N = grid_size
-        self.vectors = nn.Upsample(size=[grid_size, 1], mode='bilinear')
-        self.matrices = nn.Upsample(size=[grid_size, grid_size], mode='bilinear')
+        self.vectors.data = nn.Upsample(size=[grid_size, 1], mode='bilinear')(self.vectors.data)
+        self.matrices.data = nn.Upsample(size=[grid_size, grid_size], mode='bilinear')(self.matrices.data)
 
     def forward(self, input):
         #  input: [B, S, 3] 3D cartesian coordinate (X, Y, Z)
