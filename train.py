@@ -129,7 +129,7 @@ def train(config_path: str = None):
             print('Model saved.')
 
         # Save example image
-        if save_image and ((cur_iter <= 100 and cur_iter % 10 == 0) or cur_iter % image_save_interval == 0):
+        if save_image and (cur_iter <= 10 or (cur_iter <= 100 and cur_iter % 10 == 0) or cur_iter % image_save_interval == 0):
             example_output = []
             for start_index in range(0, H*W, batch_size):
                 end_index = min(start_index + batch_size, H*W)
