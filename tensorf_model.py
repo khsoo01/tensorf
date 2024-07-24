@@ -11,6 +11,23 @@ def make_param(shape):
     nn.init.kaiming_uniform_(param_tensor, nonlinearity='relu')
     return nn.Parameter(param_tensor)
 
+class PositionalEncodingLayer(nn.Module):
+    def __init__(self, length):
+        super(PositionalEncodingLayer, self).__init__()
+        self.length = length
+        self.coeffs = 2.0 ** torch.linspace(0, length - 1, length) * torch.pi
+
+    def forward (self, input):
+        #  input : [..., X]
+        # output : [..., 2*L*X]
+        output = []
+        for coeff in self.coeffs:
+            output.append(torch.sin(coeff * input))
+            output.append(torch.cos(coeff * input))
+        output = torch.cat(output, -1)
+
+        return output
+
 class TensorfVM(nn.Module):
     def __init__(self, N, R):
         super(TensorfVM, self).__init__()
@@ -47,7 +64,7 @@ class TensorfVM(nn.Module):
         return output
 
 class TensorfModel(nn.Module):
-    def __init__(self, grid_size=200, comp_c=24, comp_d=8, feature_dim=27, hidden_dim=128):
+    def __init__(self, grid_size=200, comp_c=24, comp_d=8, feature_dim=27, hidden_dim=128, pe_dim=6):
         super(TensorfModel, self).__init__()
 
         self.vm_c = TensorfVM(grid_size, comp_c)
@@ -61,6 +78,8 @@ class TensorfModel(nn.Module):
                                  nn.Linear(hidden_dim, 3),
                                  nn.Sigmoid())
 
+        self.pe = PositionalEncodingLayer(pe_dim)        
+
     def forward(self, input):
         #  input: [B, S, 6] (Position, Direction)
         # output: [B, S, 4] (R, G, B, Density)
@@ -69,7 +88,9 @@ class TensorfModel(nn.Module):
 
         # Evaluate Color
         feature = self.feat(self.vm_c(position))
-        mlp_input = torch.cat((feature, direction), -1)
+
+        mlp_input = [feature, direction, self.pe(position), self.pe(direction)]
+        mlp_input = torch.cat(mlp_input, -1)
         color = self.mlp(mlp_input)
 
         # Evaluate Density
