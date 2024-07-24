@@ -75,9 +75,6 @@ def train(config_path: str = None):
     if torch.cuda.is_available():
         print('Device: cuda')
         device = torch.device('cuda')
-    elif torch.backends.mps.is_available():
-        print('Device: mps')
-        device = torch.device('mps')
     else:
         print('Device: cpu')
         device = cpu
