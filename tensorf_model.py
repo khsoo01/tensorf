@@ -71,7 +71,7 @@ class TensorfModel(nn.Module):
         self.vm_d = TensorfVM(grid_size, comp_d)
 
         self.feat = nn.Linear(3*comp_c, feature_dim)
-        self.mlp = nn.Sequential(nn.Linear(feature_dim+3, hidden_dim),
+        self.mlp = nn.Sequential(nn.Linear(feature_dim+3+12*pe_dim, hidden_dim),
                                  nn.ReLU(),
                                  nn.Linear(hidden_dim, hidden_dim),
                                  nn.ReLU(),
