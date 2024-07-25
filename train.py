@@ -84,11 +84,11 @@ def train(config_path: str = None):
 
     model, cur_iter = load_model(model_path)
     model = model.to(device)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
-    optimizer = optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
-
     if cur_iter == 0:
         model.reset_grid_size(grid_size_start)
+    
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    optimizer = optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
 
     # Setup example input and ground truth image from the input
     if save_image:
@@ -132,6 +132,8 @@ def train(config_path: str = None):
             # Using get_lr since the calculation is same
             new_grid_size = int(get_lr(grid_size_start, grid_size_end, grid_size_steps.index(cur_iter)+1, len(grid_size_steps)))
             model.reset_grid_size(new_grid_size)
+            # Optimizer have to be reset due to parameter changes
+            optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
             print(f'Grid size updated to {new_grid_size}.')
 
         # Save model
