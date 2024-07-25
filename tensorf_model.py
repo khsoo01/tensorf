@@ -94,6 +94,9 @@ class TensorfModel(nn.Module):
         ]
         return param_groups
 
+    def regularization_loss(self, l1_weight):
+        return l1_weight * (torch.mean(torch.abs(self.vm_d.vectors)) + torch.mean(torch.abs(self.vm_d.matrices)))
+
     def forward(self, input):
         #  input: [B, S, 6] (Position, Direction)
         # output: [B, S, 4] (R, G, B, Density)

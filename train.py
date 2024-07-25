@@ -34,6 +34,7 @@ def train(config_path: str = None):
     lr_decay_ratio = float(config['lr_decay_ratio'])
     lr_spatial = float(config['lr_spatial'])
     lr_mlp = float(config['lr_mlp'])
+    l1_weight = float(config['l1_weight'])
     grid_size_start = int(config['grid_size_start'])
     grid_size_end = int(config['grid_size_end'])
     grid_size_steps = eval(config['grid_size_steps'])
@@ -123,7 +124,7 @@ def train(config_path: str = None):
         
         image = eval_image(inputs)
         mse_loss = nn.MSELoss()
-        loss = mse_loss(image, outputs)
+        loss = mse_loss(image, outputs) + model.regularization_loss(l1_weight).to(cpu)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
