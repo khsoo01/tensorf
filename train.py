@@ -30,8 +30,10 @@ def train(config_path: str = None):
     num_sample = int(config['num_sample'])
 
     num_iter = int(config['num_iteration'])
-    lr_start = float(config['learning_rate_start'])
-    lr_end = float(config['learning_rate_end'])
+    lr_decay_iter = int(config['lr_decay_iteration'])
+    lr_decay_ratio = float(config['lr_decay_ratio'])
+    lr_spatial = float(config['lr_spatial'])
+    lr_mlp = float(config['lr_mlp'])
     grid_size_start = int(config['grid_size_start'])
     grid_size_end = int(config['grid_size_end'])
     grid_size_steps = eval(config['grid_size_steps'])
@@ -87,8 +89,12 @@ def train(config_path: str = None):
     if cur_iter == 0:
         model.reset_grid_size(grid_size_start)
     
+    lr_factor = lr_decay_ratio**(1/lr_decay_iter)
+    lr_spatial_init = get_lr(lr_spatial, lr_spatial*lr_decay_ratio, cur_iter, lr_decay_iter)
+    lr_mlp_init = get_lr(lr_mlp, lr_mlp*lr_decay_ratio, cur_iter, lr_decay_iter)
+    optimizer = optim.Adam(model.get_param_groups(lr_spatial_init, lr_mlp_init))
+
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
-    optimizer = optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
 
     # Setup example input and ground truth image from the input
     if save_image:
@@ -125,15 +131,19 @@ def train(config_path: str = None):
 
         # Update learning rate
         for param_group in optimizer.param_groups:
-            param_group['lr'] = get_lr(lr_start, lr_end, cur_iter, num_iter)
+            param_group['lr'] *= lr_factor
 
         # Update grid size if needed
         if cur_iter in grid_size_steps:
             # Using get_lr since the calculation is same
             new_grid_size = int(get_lr(grid_size_start, grid_size_end, grid_size_steps.index(cur_iter)+1, len(grid_size_steps)))
             model.reset_grid_size(new_grid_size)
+
             # Optimizer have to be reset due to parameter changes
-            optim.Adam(model.parameters(), lr=get_lr(lr_start, lr_end, cur_iter, num_iter))
+            lr_spatial_init = get_lr(lr_spatial, lr_spatial*lr_decay_ratio, cur_iter, lr_decay_iter)
+            lr_mlp_init = get_lr(lr_mlp, lr_mlp*lr_decay_ratio, cur_iter, lr_decay_iter)
+            optimizer = optim.Adam(model.get_param_groups(lr_spatial_init, lr_mlp_init))
+
             print(f'Grid size updated to {new_grid_size}.')
 
         # Save model

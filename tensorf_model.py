@@ -60,8 +60,8 @@ class TensorfVM(nn.Module):
             vec_coord[i, :, :, 1] = 0
 
         # shape = [3, R, B, S]
-        mat_output = F.grid_sample(self.matrices, mat_coord, align_corners=False)
-        vec_output = F.grid_sample(self.vectors, vec_coord, align_corners=False)
+        mat_output = F.grid_sample(self.matrices, mat_coord, align_corners=True)
+        vec_output = F.grid_sample(self.vectors, vec_coord, align_corners=True)
 
         # shape = [B, S, 3*R]
         output = (mat_output * vec_output).permute(2, 3, 0, 1).view(B, S, -1)
@@ -75,7 +75,7 @@ class TensorfModel(nn.Module):
         self.vm_c = TensorfVM(grid_size, comp_c)
         self.vm_d = TensorfVM(grid_size, comp_d)
 
-        self.feat = nn.Linear(3*comp_c, feature_dim)
+        self.feat = nn.Linear(3*comp_c, feature_dim, bias=False)
         self.mlp = nn.Sequential(nn.Linear((1+2*pe_dim)*(3+feature_dim), hidden_dim),
                                  nn.ReLU(),
                                  nn.Linear(hidden_dim, hidden_dim),
@@ -88,6 +88,15 @@ class TensorfModel(nn.Module):
     def reset_grid_size(self, grid_size):
         self.vm_c.reset_grid_size(grid_size)
         self.vm_d.reset_grid_size(grid_size)
+
+    def get_param_groups(self, lr_spatial, lr_mlp):
+        param_groups = [
+            {'params': self.vm_c.parameters(), 'lr': lr_spatial},
+            {'params': self.vm_d.parameters(), 'lr': lr_spatial},
+            {'params': self.feat.parameters(), 'lr': lr_mlp},
+            {'params': self.mlp.parameters(), 'lr': lr_mlp}
+        ]
+        return param_groups
 
     def forward(self, input):
         #  input: [B, S, 6] (Position, Direction)
