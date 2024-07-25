@@ -115,6 +115,7 @@ def train(config_path: str = None):
 
     def train_batch(batch: torch.tensor):
         nonlocal cur_iter
+        nonlocal optimizer
 
         print(f'Training: iteration {cur_iter}.')
         # Evaluate image from batch input and backpropagate loss
