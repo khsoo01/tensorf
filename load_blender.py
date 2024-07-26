@@ -21,7 +21,7 @@ def parse_blender (fov: float, c2w: torch.tensor, image: torch.tensor) -> NerfDa
     image_alpha = image[3, :, :].reshape((1, H, W))
     colors = (image_rgb * image_alpha).permute(1, 2, 0)[:, :, :3].reshape(H*W, 3)
 
-    args = NerfDatasetArgs(width=W, height=H, near=2.0, far=6.0, max_coord=1.0)
+    args = NerfDatasetArgs(width=W, height=H, near=2.0, far=6.0, max_coord=2.0)
     return NerfDataset(args=args, rays=rays, colors=colors)
 
 def load_blender (base_path: str, res_ratio: float = 1.0) -> Dict[str, NerfDataset]:
